@@ -1,4 +1,5 @@
 http {
+    server_tokens off;
     include       mime.types;
     default_type  application/octet-stream;
 
