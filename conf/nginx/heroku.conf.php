@@ -45,7 +45,7 @@ http {
         }
     }
     server {
-      listen       <%= ENV['PORT'] %>;;
+      listen      <?=getenv('PORT')?:'8080'?>
       server_name  wut.bakatube.net;
    
       access_log  /var/log/nginx/access.log;
