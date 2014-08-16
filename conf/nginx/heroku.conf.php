@@ -19,7 +19,6 @@ http {
 
     fastcgi_buffers 256 4k;
 
-    # define an easy to reference name that can be used in fastgi_pass
     upstream heroku-fcgi {
         #server 127.0.0.1:4999 max_fails=3 fail_timeout=3s;
         server unix:/tmp/heroku.fcgi.<?=getenv('PORT')?:'8080'?>.sock max_fails=3 fail_timeout=3s;
@@ -27,40 +26,44 @@ http {
     }
     
     server {
-        # TODO: use X-Forwarded-Host? http://comments.gmane.org/gmane.comp.web.nginx.english/2170
-        server_name localhost;
         listen <?=getenv('PORT')?:'8080'?>;
-        # FIXME: breaks redirects with foreman
-        port_in_redirect off;
-        
+        server_name localhost;
         root <?=getenv('DOCUMENT_ROOT')?:getenv('HEROKU_APP_DIR')?:getcwd()?>;
         
         error_log stderr;
         access_log /tmp/heroku.nginx_access.<?=getenv('PORT')?:'8080'?>.log;
-        
-        include <?=getenv('HEROKU_PHP_NGINX_CONFIG_INCLUDE')?>;
-        
-        # restrict access to hidden files, just in case
-        location ~ /\. {
-            deny all;
-        }
-        
+                
         # default handling of .php
+        location / {
+            index  index.php index.html index.htm;
+        }
         location ~ \.php {
+            try_files $uri =404;
             include fastcgi_params;
-            
-            fastcgi_split_path_info ^(.+\.php)(/.*)$;
-            fastcgi_param SCRIPT_FILENAME $document_root$fastcgi_script_name;
-            # try_files resets $fastcgi_path_info, see http://trac.nginx.org/nginx/ticket/321, so we use the if instead
-            fastcgi_param PATH_INFO $fastcgi_path_info if_not_empty;
-            
-            if (!-f $document_root$fastcgi_script_name) {
-                # check if the script exists
-                # otherwise, /foo.jpg/bar.php would get passed to FPM, which wouldn't run it as it's not in the list of allowed extensions, but this check is a good idea anyway, just in case
-                return 404;
-            }
-            
+            fastcgi_param  SCRIPT_FILENAME $document_root$fastcgi_script_name;
             fastcgi_pass heroku-fcgi;
         }
     }
+    server {
+      listen       <%= ENV['PORT'] %>;;
+      server_name  wut.bakatube.net;
+   
+      access_log  /var/log/nginx/access.log;
+      error_log  /var/log/nginx/error.log;
+      root   /usr/share/nginx/html;
+      index  index.html index.htm;
+   
+      location / {
+       valid_referers none blocked bakatube.net www.bakatube.net ~\.google\. ~\.yahoo\. ~\.bing\. ~\.facebook\. ~\.fbcdn\.;
+       if ($invalid_referer) {
+         return 403;
+       }
+       proxy_pass  http://www7.mp4upload.com:182;
+       proxy_next_upstream error timeout invalid_header http_500 http_502 http_503 http_504;
+       proxy_redirect off;
+       proxy_buffering off;
+       proxy_set_header        Host            "www7.mp4upload.com";
+       proxy_set_header        X-Real-IP       $remote_addr;
+     }
+  }
 }
